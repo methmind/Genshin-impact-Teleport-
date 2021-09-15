@@ -89,6 +89,22 @@ void _cls()
 	} while (false);
 }
 
+void SetCursorPos(int iSelected)
+{
+	COORD curPos = { 0, iSelected };
+	HANDLE hConsole = 0;
+
+	do
+	{
+		if ((hConsole = GetStdHandle(STD_OUTPUT_HANDLE)) == NULL)
+			break;
+
+		if (!SetConsoleCursorPosition(hConsole, curPos))
+			break;
+
+	} while (false);
+}
+
 DWORD64 GetModuleBaseAddr(DWORD dwPid, LPCWSTR lpDllName) 
 {
 	HANDLE hSnap = 0;
@@ -465,7 +481,9 @@ void EnumAllFiles(int iSelected, String& strSelected)
 
 	} while (false);
 
-	if (!iCount)
+	if (iCount)
+		SetCursorPos(iSelected);
+	else
 		wprintf(L"U dont have a locations :(\n");
 
 	if(hFind)
