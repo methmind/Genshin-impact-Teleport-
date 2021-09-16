@@ -42,12 +42,13 @@ enum Offset
 
 	//
 
-	m_dwRelPointer = 0x0B1AAB68,
+	m_dwRelPointer = 0x0AE93938,
 	m_dwRelPointer2 = 0xA0,
-	m_dwRelPointer3 = 0xC88,
-	m_dwRelPointer4 = 0x2D0,
-	m_dwRelPointer5 = 0x10,
-	m_dwRelPointer6 = 0x68,
+	m_dwRelPointer3 = 0x20,
+	m_dwRelPointer4 = 0x108,
+	m_dwRelPointer5 = 0x3B0,
+	m_dwRelPointer6 = 0x10,
+	m_dwRelPointer7 = 0x68,
 	//
 	m_vecRelative = 0xA0,
 	m_vecRelative2 = 0x140,
@@ -136,20 +137,43 @@ DWORD64 GetModuleBaseAddr(DWORD dwPid, LPCWSTR lpDllName)
 	return dwBaseAddr;
 }
 
+DWORD GetProcessId(LPCWSTR lpName)
+{
+	PROCESSENTRY32 procEntry = { sizeof(procEntry) };
+	DWORD dwPid = 0;
+	HANDLE hSnap = 0;
+	do
+	{
+		if ((hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)) == INVALID_HANDLE_VALUE)
+			break;
+
+		if (!Process32First(hSnap, &procEntry))
+			break;
+
+		do
+		{
+			if (!lstrcmpW(procEntry.szExeFile, lpName))
+			{
+				dwPid = procEntry.th32ProcessID;
+				break;
+			}
+		} while (Process32Next(hSnap, &procEntry));
+
+	} while (false);
+
+	if(hSnap)
+		CloseHandle(hSnap);
+	
+	return dwPid;
+}
+
 void GetGameInfo(GameInfo &Info)
 {
 	while (true)
 	{
-		HWND hWnd = 0;
 		do
 		{
-			if ((hWnd = FindWindowW(0, L"Genshin Impact")) == NULL)
-			{
-				wprintf(L"Window didnt found!\n");
-				break;
-			}
-
-			if (!GetWindowThreadProcessId(hWnd, &Info.dwPid))
+			if ((Info.dwPid = GetProcessId(L"GenshinImpact.exe")) == NULL)
 			{
 				wprintf(L"Couldnt get PID!\n");
 				break;
@@ -199,6 +223,7 @@ void SetRelativePosition(GameInfo gInfo, GameVector& vecInfo)
 	DWORD64 dwPointer4 = 0;
 	DWORD64 dwPointer5 = 0;
 	DWORD64 dwPointer6 = 0;
+	DWORD64 dwPointer7 = 0;
 	SIZE_T szWritten = 0;
 	do
 	{
@@ -238,14 +263,20 @@ void SetRelativePosition(GameInfo gInfo, GameVector& vecInfo)
 			break;
 		}
 
-		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_vecRelative), &vecInfo, sizeof(GameVector), &szWritten))
+		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_dwRelPointer7), &dwPointer7, sizeof(DWORD64), 0))
+		{
+			wprintf(L"Couldnt read pointer 7 to relative cords!\n");
+			break;
+		}
+
+		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer7 + Offset::m_vecRelative), &vecInfo, sizeof(GameVector), &szWritten))
 		{
 			wprintf(L"Couldnt write relative cords!\n");
 			break;
 		}
 
 		szWritten = 0;
-		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_vecRelative2), &vecInfo, sizeof(GameVector), &szWritten))
+		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer7 + Offset::m_vecRelative2), &vecInfo, sizeof(GameVector), &szWritten))
 		{
 			wprintf(L"Couldnt write 2 relative cords!\n");
 			break;
@@ -262,6 +293,7 @@ void GetRelativePosition(GameInfo gInfo, GameVector& vecInfo)
 	DWORD64 dwPointer4 = 0;
 	DWORD64 dwPointer5 = 0;
 	DWORD64 dwPointer6 = 0;
+	DWORD64 dwPointer7 = 0;
 	do
 	{
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(gInfo.dwUserAssembly + Offset::m_dwRelPointer), &dwPointer, sizeof(DWORD64), 0))
@@ -300,7 +332,13 @@ void GetRelativePosition(GameInfo gInfo, GameVector& vecInfo)
 			break;
 		}
 
-		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_vecRelative), &vecInfo, sizeof(GameVector), 0))
+		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_dwRelPointer7), &dwPointer7, sizeof(DWORD64), 0))
+		{
+			wprintf(L"Couldnt read pointer 7 to relative cords!\n");
+			break;
+		}
+
+		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer7 + Offset::m_vecRelative), &vecInfo, sizeof(GameVector), 0))
 		{
 			wprintf(L"Couldnt read relative cords!\n");
 			break;
@@ -317,55 +355,62 @@ void SetRelativeVelocity(GameInfo gInfo, GameVector& vecInfo)
 	DWORD64 dwPointer4 = 0;
 	DWORD64 dwPointer5 = 0;
 	DWORD64 dwPointer6 = 0;
+	DWORD64 dwPointer7 = 0;
 	SIZE_T szWritten = 0;
 	do
 	{
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(gInfo.dwUserAssembly + Offset::m_dwRelPointer), &dwPointer, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer to velocity!\n");
+			wprintf(L"Couldnt read pointer to velocity!\n");
 			break;
 		}
 
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer + Offset::m_dwRelPointer2), &dwPointer2, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer 2 to velocity!\n");
+			wprintf(L"Couldnt read pointer 2 to velocity!\n");
 			break;
 		}
 
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer2 + Offset::m_dwRelPointer3), &dwPointer3, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer 3 to velocity!\n");
+			wprintf(L"Couldnt read pointer 3 to velocity!\n");
 			break;
 		}
 
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer3 + Offset::m_dwRelPointer4), &dwPointer4, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer 4 to relative cords!\n");
+			wprintf(L"Couldnt read pointer 4 to relative cords!\n");
 			break;
 		}
 
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer4 + Offset::m_dwRelPointer5), &dwPointer5, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer 5 to relative cords!\n");
+			wprintf(L"Couldnt read pointer 5 to relative cords!\n");
 			break;
 		}
 
 		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer5 + Offset::m_dwRelPointer6), &dwPointer6, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt read pointer 6 to relative cords!\n");
+			wprintf(L"Couldnt read pointer 6 to relative cords!\n");
 			break;
 		}
 
-		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_vecVelocity), &vecInfo, sizeof(GameVector), &szWritten))
+		if (!ReadProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_dwRelPointer7), &dwPointer7, sizeof(DWORD64), 0))
 		{
-			wprintf(L"  [Error] Couldnt write velocity!\n");
+			wprintf(L"Couldnt read pointer 7 to relative cords!\n");
+			break;
+		}
+
+		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer7 + Offset::m_vecVelocity), &vecInfo, sizeof(GameVector), &szWritten))
+		{
+			wprintf(L"Couldnt write velocity!\n");
 			break;
 		}
 
 		szWritten = 0;
-		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer6 + Offset::m_vecVelocity2), &vecInfo, sizeof(GameVector), &szWritten))
+		if (!WriteProcessMemory(gInfo.hProc, (LPVOID)(dwPointer7 + Offset::m_vecVelocity2), &vecInfo, sizeof(GameVector), &szWritten))
 		{
-			wprintf(L"  [Error] Couldnt write 2 velocity!\n");
+			wprintf(L"Couldnt write 2 velocity!\n");
 			break;
 		}
 
@@ -505,6 +550,7 @@ int main()
 	int iSelected = 0;
 	//
 	bool bShowed = false;
+	bool bSpeed = false;
 	GetGameInfo(gInfo);
 
 	do
@@ -577,6 +623,7 @@ int main()
 				vecTemp3.z = vecTemp2.z;
 				wprintf(L"[vector]\nx=%f\ny=%f\nz=%f", vecTemp3.x, vecTemp3.y, vecTemp3.z);
 			}
+
 			Sleep(5);
 		}
 	} while (false);
